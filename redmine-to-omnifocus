@@ -30,7 +30,7 @@ issues are exported. The script also expects the date format to be set in
 Redmine on the Display tab in Settings to the dd Mmm YYYY format, such as 19 Sep 2011
 
 The requirements are:
- 
+
   1. Nothing is lost: If a task is assigned to you, then you must be
      able to see it in OmniFocus.
 
@@ -85,7 +85,7 @@ from BeautifulSoup import BeautifulSoup
 
 class RedmineConnection(object):
     def __init__(self, redmine_url, username=None, password=None):
-        self.url = redmine_url 
+        self.url = redmine_url
         self.cookiejar = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cookiejar))
         self.logged_in = False
@@ -117,7 +117,7 @@ class RedmineConnection(object):
         token = soup.find(attrs={'name': 'authenticity_token'})
         if token is not None:
             data['authenticity_token'] = token['value']
-        
+
         self._get("login", urlencode(data))
 
     def _logout(self):
@@ -147,8 +147,9 @@ sys.stdout = codecs.getwriter("UTF-8")(sys.stdout)
 STATUS='status'
 CHANGED='changed'
 COMPLETED='completed'
-
+ICON="http://www.omnigroup.com/images/sized/assets/images/icons/omnifocus-128-75x75.png"
 console_log_type = ""
+
 def console_log(type, msg):
     global console_log_type
     if console_log_type != type:
@@ -159,18 +160,23 @@ def console_log(type, msg):
 log = console_log
 
 def use_growl_logger():
-    from Growl import GrowlNotifier
-    growl = GrowlNotifier(applicationName='redmine-to-omnifocus',
-                          notifications=[STATUS, CHANGED, COMPLETED],
-                          hostname='localhost', password='')
-                          
+    import gntp.notifier
+
+    growl = gntp.notifier.GrowlNotifier(applicationName='redmine-to-omnifocus',
+                                        notifications=[STATUS, CHANGED, COMPLETED],
+                                        defaultNotifications = [STATUS]
+                                       )
+
     growl.register()
 
     def growl_log(type, msg):
         console_log(type, msg)
         growl.notify(title=type,
                      description=msg,
-                     noteType=type)
+                     noteType=type,
+                     sticky=False,
+                     priority=1,
+                     icon=ICON)
 
     global log
     log = growl_log
@@ -192,7 +198,7 @@ def sync_task(url, folder, projects, tasks,
         return t
 
     assigned_to_me = re.match(me, row['Assigned to'], re.I) is not None
-    
+
     p = projects.get(row['Project'])
     t = get_existing_task(tasks, int(row['#']))
 
@@ -209,7 +215,7 @@ def sync_task(url, folder, projects, tasks,
             p = folder.make(new=k.project,
                             with_properties={k.name: row['Project']})
             projects[row['Project']] = p
-        
+
         name = "#%s: %s" % (row['#'], row['Subject'])
         note = "%s\n\nAssigned to: %s\tStatus: %s\n\n%s" % \
                (urljoin(url, "issues/show/" + row['#']),
@@ -226,8 +232,8 @@ def sync_task(url, folder, projects, tasks,
         estimated_minutes = k.missing_value
         if len(row['Estimated time']):
             estimated_minutes = int(round(float(row['Estimated time']) * 60))
-        
-        
+
+
         if assigned_to_me:
             context = assigned
         elif not len(row['Assigned to']):
@@ -247,7 +253,7 @@ def sync_task(url, folder, projects, tasks,
             if (val == k.missing_value and prop.get() == 0) or \
                (val == 0 and prop.get() == k.missing_value):
                 return
-            
+
             if prop.get() != val:
                 print prop, "=", prop.get(), "->", val
                 changed[0] = t
@@ -332,7 +338,7 @@ def existing_tasks_(container, tasks):
             (issue, subject) = t.name.get().split(':', 1)
             tasks[int(issue[1:])] = t
         existing_tasks_(t, tasks)
-        
+
 def existing_tasks(folder, tasks = None):
     if tasks is None:
         tasks = {}
@@ -384,7 +390,7 @@ def process(rows, url, folder_path, me,
 
     for t in changed:
         log("changed", logformat(t))
-            
+
     for t in completed:
         log("completed", logformat(t))
 
